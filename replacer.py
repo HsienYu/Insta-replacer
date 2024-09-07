@@ -3,12 +3,14 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
 from selenium.common.exceptions import StaleElementReferenceException
 
+
 import time
 import asyncio
+import random
 
 
 # Define the session ID
-SESSION_ID = "{your SESSION_ID here}"
+SESSION_ID = "your_session_id_here"
 
 # Initialize FirefoxOptions
 # test on macOS only for RPi linux OS may need to load the geckodriver in the PATH
@@ -57,13 +59,13 @@ def click_not_now():
     except Exception as e:
         print("No 'Not Now' for saving login info found:", e)
 
-    try:
-        # Click "Not Now" for notifications
-        not_notification = driver.find_element(By.CSS_SELECTOR, 'button._a9_1')
-        not_notification.click()
-        print("Not Now Notification")
-    except Exception as e:
-        print("No 'Not Now' for notifications found:", e)
+    # try:
+    #     # Click "Not Now" for notifications
+    #     not_notification = driver.find_element(By.CSS_SELECTOR, 'button._a9_1')
+    #     not_notification.click()
+    #     print("Not Now Notification")
+    # except Exception as e:
+    #     print("No 'Not Now' for notifications found:", e)
 
 
 # Function to wait for all images and videos to load
@@ -140,26 +142,46 @@ async def disable_media():
 # Scroll down
 
 
-async def scroll_down(timeout):
-    # You can set your own pause time. My laptop is a bit slow so I use 1 sec
+async def page_scrolling(timeout):
     scroll_pause_time = timeout
-    screen_height = driver.execute_script(
-        "return window.screen.height;")   # get the screen height of the web
-    i = 1
+    screen_height = driver.execute_script("return window.screen.height;")
+    i = 0.5
+    previous_scroll_height = 0
+    attempts = 0
+    max_attempts = 5
+
     while True:
         await preload_media()
         await disable_media()
-        # scroll one screen height each time
         driver.execute_script(
             "window.scrollTo(0, {screen_height}*{i});".format(screen_height=screen_height, i=i))
-        i += 1
+        i += 0.5
         time.sleep(scroll_pause_time)
-        # update scroll height each time after scrolled
         scroll_height = driver.execute_script(
             "return document.body.scrollHeight;")
+
+        if scroll_height == previous_scroll_height:
+            attempts += 1
+            if attempts >= max_attempts:
+                print("Reached the bottom of the page or no new content is loading.")
+                break
+        else:
+            attempts = 0
+
+        previous_scroll_height = scroll_height
+
         if (screen_height) * i > scroll_height:
             print("Scrolling down to the bottom of the page")
-            # then do something maybe search new content???
+            break
+
+    # Scroll back to the top
+    while i > 0:
+        i -= 0.5
+        driver.execute_script(
+            "window.scrollTo(0, {screen_height}*{i});".format(screen_height=screen_height, i=i))
+        time.sleep(scroll_pause_time)
+        if i <= 0:
+            print("Scrolled back to the top of the page")
             break
 
 # Main function
@@ -171,7 +193,7 @@ async def main():
     await preload_media()
     await disable_media()
     await asyncio.sleep(1)
-    await scroll_down(2)
+    await page_scrolling(2)
 
 try:
     asyncio.run(main())
