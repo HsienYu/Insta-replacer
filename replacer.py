@@ -1,6 +1,8 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
+from selenium.common.exceptions import StaleElementReferenceException
+
 import time
 import asyncio
 
@@ -69,30 +71,38 @@ async def preload_media():
     # Preload images
     images = driver.find_elements(By.CSS_SELECTOR, 'img')
     for img in images:
-        driver.execute_script("""
-            return new Promise((resolve) => {
-                if (arguments[0].complete) {
-                    resolve();
-                } else {
-                    arguments[0].addEventListener('load', resolve);
-                    arguments[0].addEventListener('error', resolve);
-                }
-            });
-        """, img)
+        try:
+            driver.execute_script("""
+                return new Promise((resolve) => {
+                    if (arguments[0].complete) {
+                        resolve();
+                    } else {
+                        arguments[0].addEventListener('load', resolve);
+                        arguments[0].addEventListener('error', resolve);
+                    }
+                });
+            """, img)
+        except StaleElementReferenceException:
+            print(
+                "StaleElementReferenceException encountered for an image. Skipping this element.")
 
     # Preload videos
     videos = driver.find_elements(By.CSS_SELECTOR, 'video')
     for video in videos:
-        driver.execute_script("""
-            return new Promise((resolve) => {
-                if (arguments[0].readyState >= 3) {  // HAVE_FUTURE_DATA
-                    resolve();
-                } else {
-                    arguments[0].addEventListener('canplay', resolve);
-                    arguments[0].addEventListener('error', resolve);
-                }
-            });
-        """, video)
+        try:
+            driver.execute_script("""
+                return new Promise((resolve) => {
+                    if (arguments[0].readyState >= 3) {  // HAVE_FUTURE_DATA
+                        resolve();
+                    } else {
+                        arguments[0].addEventListener('canplay', resolve);
+                        arguments[0].addEventListener('error', resolve);
+                    }
+                });
+            """, video)
+        except StaleElementReferenceException:
+            print(
+                "StaleElementReferenceException encountered for a video. Skipping this element.")
 
     print("All images and videos preloaded")
 
