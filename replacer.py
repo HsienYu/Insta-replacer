@@ -1,16 +1,17 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
-from selenium.common.exceptions import StaleElementReferenceException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 
 
-import time
 import asyncio
-import random
+from concurrent.futures import ThreadPoolExecutor
 
 
 # Define the session ID
-SESSION_ID = "your_session_id_here"
+SESSION_ID = "{your SESSION_ID here}"
 
 # Initialize FirefoxOptions
 # test on macOS only for RPi linux OS may need to load the geckodriver in the PATH
@@ -20,9 +21,6 @@ options.add_argument("--height=1440")
 driver = webdriver.Firefox(options=options)
 driver.set_window_position(0, 0)
 driver.get('https://www.instagram.com')
-
-# wait for the page to load
-time.sleep(2)
 
 
 # login by session to avoid some login issues
@@ -42,9 +40,6 @@ driver.refresh()
 # Now you should be logged in with the session ID
 print("Logged in with session ID")
 
-# Wait for the page to load
-time.sleep(5)
-
 # click "Not Now" buttons
 # i think not neqssary to fo aync here
 
@@ -52,20 +47,14 @@ time.sleep(5)
 def click_not_now():
     try:
         # Click "Not Now" for saving login info
-        not_store = driver.find_element(By.XPATH, '//button[text()="Not Now"]')
+        not_store = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable(
+                (By.XPATH, '//button[text()="Not Now"]'))
+        )
         not_store.click()
         print("Not Now Store")
-        time.sleep(3)
-    except Exception as e:
-        print("No 'Not Now' for saving login info found:", e)
-
-    # try:
-    #     # Click "Not Now" for notifications
-    #     not_notification = driver.find_element(By.CSS_SELECTOR, 'button._a9_1')
-    #     not_notification.click()
-    #     print("Not Now Notification")
-    # except Exception as e:
-    #     print("No 'Not Now' for notifications found:", e)
+    except TimeoutException:
+        print("No 'Not Now' for saving login info found")
 
 
 # Function to wait for all images and videos to load
@@ -145,7 +134,7 @@ async def disable_media():
 async def page_scrolling(timeout):
     scroll_pause_time = timeout
     screen_height = driver.execute_script("return window.screen.height;")
-    i = 0.5
+    pixels_per_step = screen_height // 2  # Scroll by half screen height per step
     previous_scroll_height = 0
     attempts = 0
     max_attempts = 5
@@ -153,10 +142,9 @@ async def page_scrolling(timeout):
     while True:
         await preload_media()
         await disable_media()
-        driver.execute_script(
-            "window.scrollTo(0, {screen_height}*{i});".format(screen_height=screen_height, i=i))
-        i += 0.5
-        time.sleep(scroll_pause_time)
+        driver.execute_script("window.scrollBy(0, {pixels_per_step});".format(
+            pixels_per_step=pixels_per_step))
+        await asyncio.sleep(scroll_pause_time)
         scroll_height = driver.execute_script(
             "return document.body.scrollHeight;")
 
@@ -170,34 +158,42 @@ async def page_scrolling(timeout):
 
         previous_scroll_height = scroll_height
 
-        if (screen_height) * i > scroll_height:
+        if driver.execute_script("return window.pageYOffset + window.innerHeight;") >= scroll_height:
             print("Scrolling down to the bottom of the page")
             break
 
     # Scroll back to the top
-    while i > 0:
-        i -= 0.5
+    while driver.execute_script("return window.pageYOffset;") > 0:
         driver.execute_script(
-            "window.scrollTo(0, {screen_height}*{i});".format(screen_height=screen_height, i=i))
-        time.sleep(scroll_pause_time)
-        if i <= 0:
+            "window.scrollBy(0, -{pixels_per_step});".format(pixels_per_step=pixels_per_step))
+        await asyncio.sleep(scroll_pause_time)
+        if driver.execute_script("return window.pageYOffset;") <= 0:
             print("Scrolled back to the top of the page")
             break
+
 
 # Main function
 
 
 async def main():
-    await asyncio.sleep(5)
-    click_not_now()
-    await preload_media()
-    await disable_media()
-    await asyncio.sleep(1)
-    await page_scrolling(2)
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as executor:
+        try:
+            await asyncio.sleep(5)
+            await loop.run_in_executor(executor, click_not_now)
+            await preload_media()
+            await disable_media()
+            await asyncio.sleep(1)
+            await page_scrolling(2)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+        finally:
+            driver.quit()
 
-try:
-    asyncio.run(main())
-except KeyboardInterrupt:
-    print("Script interrupted by user")
-finally:
-    driver.quit()
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Script interrupted by user")
+    finally:
+        driver.quit()
