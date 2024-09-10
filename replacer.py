@@ -11,7 +11,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 
-# Define the session ID
+# Define the session ID, in broswer cookie session ID, not storage session ID
 SESSION_ID = "{your SESSION_ID here}"
 
 # Initialize FirefoxOptions
@@ -189,8 +189,6 @@ async def main():
         try:
             await asyncio.sleep(5)
             await loop.run_in_executor(executor, click_not_now)
-            await preload_media()
-            await disable_media()
             await asyncio.sleep(1)
             await page_scrolling(2)
         except Exception as e:
