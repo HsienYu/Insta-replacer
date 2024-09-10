@@ -1,3 +1,4 @@
+from selenium.webdriver.firefox.service import Service
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
@@ -19,6 +20,13 @@ options = Options()
 options.add_argument("--width=800")
 options.add_argument("--height=1440")
 driver = webdriver.Firefox(options=options)
+# load specific path for driver if needed
+'''Specify the path to the geckodriver executable'''
+# geckodriver_path = "/webdriver/geckodriver"
+# service = Service(executable_path=geckodriver_path)
+# driver = webdriver.Firefox(service=service, options=options)
+
+# Set the window size and position
 driver.set_window_position(0, 0)
 driver.get('https://www.instagram.com')
 
